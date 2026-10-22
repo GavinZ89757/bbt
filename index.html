@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#c2405a">
+<!-- "only light": stops Chrome / 小米浏览器 forced dark mode from inverting the chart colours -->
+<meta name="color-scheme" content="only light">
+<meta name="format-detection" content="telephone=no, date=no">
+<!-- No external requests at all: data never leaves the phone. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'">
+<title>体温日记</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --pri: #c2405a; --pri-dark: #9c2f46; --bg: #fff7f8; --card: #fff; --text: #2b2b2b; --muted: #666; --line: #f0dfe2; --border: #e3c9ce; --focus: #1e6fd9; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: -apple-system, Roboto, "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.5; padding-bottom: calc(70px + env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
+  .topbar { position: sticky; top: 0; z-index: 5; background: var(--pri); color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; }
+  .topbar h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  .demo-banner { background: #fff3cd; color: #5c4400; padding: 8px 16px; font-size: 14px; }
+  main { max-width: 640px; margin: 0 auto; padding: 12px; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .big { font-size: 22px; font-weight: 700; color: var(--pri-dark); }
+  .summary dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; font-size: 15px; }
+  .summary dt { color: var(--muted); }
+  .summary dd { margin: 0; }
+  .field { display: block; margin: 0 0 14px; border: 0; padding: 0; min-width: 0; }
+  .field-label, legend { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+  input[type=date], input[type=text] { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--text); min-height: 44px; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; }
+  .row button { flex: none; width: 48px; padding: 0; font-size: 22px; }
+  #fTemp { text-align: center; font-size: 22px; font-weight: 600; letter-spacing: .5px; }
+  .hint { display: block; color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+  .seg { display: flex; gap: 6px; }
+  .seg label { flex: 1 1 0; position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; width: 100%; height: 100%; }
+  .seg span { display: block; text-align: center; padding: 9px 0; border: 1px solid var(--border); border-radius: 10px; background: #fff; font-size: 15px; min-height: 44px; line-height: 24px; }
+  .seg input:checked + span { background: var(--pri); border-color: var(--pri); color: #fff; font-weight: 600; }
+  .seg input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 14px; font-size: 15px; }
+  .check input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--pri); flex: none; }
+  .check small { color: var(--muted); }
+  button { font: inherit; border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; touch-action: manipulation; }
+  button.primary { background: var(--pri); border-color: var(--pri); color: #fff; font-weight: 600; }
+  button.danger { color: #b3261e; border-color: #f0b8b3; }
+  button:disabled { opacity: .45; cursor: default; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .actions .primary { flex: 1; }
+  /* chart */
+  .cycle-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cycle-nav button { width: 44px; padding: 0; font-size: 22px; flex: none; }
+  .cycle-title { flex: 1; text-align: center; font-weight: 600; font-size: 15px; }
+  .cycle-title small { display: block; color: var(--muted); font-weight: normal; font-size: 12px; }
+  .info { font-size: 14px; color: #444; margin: 0 0 10px; }
+  .chart-wrap { display: flex; border: 1px solid #e6e6e6; border-radius: 10px; overflow: hidden; background: #fff; }
+  .chart-axis { flex: none; border-right: 1px solid #d0d0d0; }
+  .chart-scroll { flex: 1; overflow-x: auto; overscroll-behavior-x: contain; }
+  .chart-wrap svg { display: block; }
+  .chart-scroll .hit { cursor: pointer; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); margin: 8px 0 0; padding: 0; list-style: none; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  /* history */
+  .hist-list { list-style: none; margin: 0; padding: 0; }
+  .hist-list .month { font-size: 13px; color: var(--muted); padding: 12px 2px 4px; font-weight: 600; }
+  .hist { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f3e6e8; }
+  .hist-main { flex: 1; text-align: left; border: 0; background: none; padding: 10px 2px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; border-radius: 0; min-width: 0; }
+  .hist-date { min-width: 78px; font-weight: 600; }
+  .hist-date small { font-weight: normal; color: var(--muted); margin-left: 4px; }
+  .hist-temp { min-width: 66px; font-variant-numeric: tabular-nums; }
+  .hist-temp.dist { color: #888; }
+  .tag { font-size: 12.5px; padding: 1px 8px; border-radius: 999px; background: #f2f2f2; color: #444; }
+  .tag.flow { background: #fde3e7; color: #9c2337; }
+  .tag.lh { background: #fff1dc; color: #7a4200; }
+  .tag.sex { background: #fbe4ef; color: #8f1a51; }
+  .note { flex-basis: 100%; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-del { flex: none; font-size: 13px; padding: 0 12px; color: #b3261e; border-color: #f0d0cd; }
+  .about { padding-left: 18px; margin: 0; }
+  .about li { margin-bottom: 6px; }
+  /* tab bar */
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+  .tabbar button { flex: 1; border: 0; border-radius: 0; background: none; padding: 6px 0 4px; min-height: 58px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); }
+  .tabbar .ico { font-size: 20px; line-height: 1.2; }
+  .tabbar button[aria-selected="true"] { color: var(--pri); font-weight: 600; }
+  #toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(40,40,40,.92); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; max-width: 90vw; }
+  #toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+</head>
+<body>
+<header class="topbar"><h1>体温日记 · 基础体温表</h1></header>
+<div class="demo-banner" id="demoBanner" hidden>演示模式：显示的是示例数据，不会保存。去掉网址末尾的 ?demo 即可正常使用。</div>
+
+<main>
+  <!-- 记录 -->
+  <section id="tab-record" class="tab" role="tabpanel" aria-labelledby="t-record">
+    <div class="card summary" id="summary" aria-live="polite"></div>
+
+    <form id="recForm" class="card" novalidate>
+      <h2 id="formTitle">今天</h2>
+
+      <div class="field">
+        <label class="field-label" for="fDate">日期</label>
+        <div class="row">
+          <button type="button" id="dPrev" aria-label="前一天">‹</button>
+          <input type="date" id="fDate" required>
+          <button type="button" id="dNext" aria-label="后一天">›</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="fTemp">基础体温（℃）</label>
+        <div class="row">
+          <button type="button" class="step" data-step="-0.01" aria-label="减 0.01 度">−</button>
+          <input type="text" id="fTemp" inputmode="decimal" autocomplete="off" placeholder="如 36.45" aria-describedby="tempHint">
+          <button type="button" class="step" data-step="0.01" aria-label="加 0.01 度">+</button>
+        </div>
+        <small class="hint" id="tempHint">早上醒来后、起床活动和说话前测量，尽量每天同一时间。可直接输入 3645。</small>
+      </div>
+
+      <fieldset class="field">
+        <legend>月经</legend>
+        <div class="seg">
+          <label><input type="radio" name="flow" value="0" checked><span>无</span></label>
+          <label><input type="radio" name="flow" value="1"><span>点滴</span></label>
+          <label><input type="radio" name="flow" value="2"><span>少</span></label>
+          <label><input type="radio" name="flow" value="3"><span>中</span></label>
+          <label><input type="radio" name="flow" value="4"><span>多</span></label>
+        </div>
+        <small class="hint">月经第一天选“少/中/多”即自动开始新周期；排卵期少量出血请选“点滴”。</small>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>排卵试纸</legend>
+        <div class="seg">
+          <label><input type="radio" name="lh" value="" checked><span>未测</span></label>
+          <label><input type="radio" name="lh" value="neg"><span>阴性</span></label>
+          <label><input type="radio" name="lh" value="weak"><span>弱阳</span></label>
+          <label><input type="radio" name="lh" value="pos"><span>强阳</span></label>
+        </div>
+      </fieldset>
+
+      <label class="check"><input type="checkbox" id="fSex"><span>同房</span></label>
+      <label class="check"><input type="checkbox" id="fDist"><span>体温受干扰<br><small>发烧、熬夜、饮酒、测量时间明显不同等。这天的体温不参与排卵判断。</small></span></label>
+
+      <div class="field">
+        <label class="field-label" for="fNote">备注</label>
+        <input type="text" id="fNote" maxlength="200" autocomplete="off" placeholder="可选">
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="primary">保存</button>
+        <button type="button" id="btnDel" class="danger" hidden>删除这天</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 图表 -->
+  <section id="tab-chart" class="tab" role="tabpanel" aria-labelledby="t-chart" hidden>
+    <div class="card" id="chartEmpty"><p class="hint">还没有数据。先去“记录”页记几天体温吧。</p></div>
+    <div class="card" id="chartBody">
+      <div class="cycle-nav">
+        <button type="button" id="prevCycle" aria-label="上一个周期">‹</button>
+        <div class="cycle-title" id="cycleTitle" aria-live="polite"></div>
+        <button type="button" id="nextCycle" aria-label="下一个周期">›</button>
+      </div>
+      <p class="info" id="cycleInfo"></p>
+      <div class="chart-wrap">
+        <div class="chart-axis" id="chartAxis"></div>
+        <div class="chart-scroll" id="chartScroll"></div>
+      </div>
+      <ul class="legend">
+        <li><i style="background:#1e6fd9"></i>低温期</li>
+        <li><i style="background:#d63a4a"></i>高温期</li>
+        <li><i style="background:#fff;border:1.5px solid #9e9e9e"></i>受干扰</li>
+        <li><i style="background:#ef6c00;border-radius:0;height:3px;vertical-align:3px"></i>覆盖线</li>
+        <li><i style="background:#ece3fa;border-radius:2px"></i>推测排卵日</li>
+        <li><i style="background:#e3eefc;border-radius:2px"></i>预测易孕期</li>
+        <li><i style="background:#fde3e7;border-radius:2px"></i>经期</li>
+      </ul>
+      <p class="hint">左右滑动查看整个周期；点某一天可以修改那天的记录。</p>
+      <div class="actions" style="margin-top:10px"><button type="button" id="btnPng" class="primary">保存 / 分享图表图片</button></div>
+    </div>
+  </section>
+
+  <!-- 历史 -->
+  <section id="tab-history" class="tab" role="tabpanel" aria-labelledby="t-history" hidden>
+    <div class="card">
+      <h2>全部记录</h2>
+      <ul class="hist-list" id="histList"></ul>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section id="tab-settings" class="tab" role="tabpanel" aria-labelledby="t-settings" hidden>
+    <div class="card">
+      <h2>数据备份</h2>
+      <p class="hint" id="dataInfo"></p>
+      <div class="actions" style="margin-top:10px">
+        <button type="button" id="btnExport" class="primary">导出备份文件</button>
+        <button type="button" id="btnImport">从备份恢复</button>
+        <input type="file" id="fileImport" accept=".json,application/json" hidden>
+      </div>
+      <p class="hint">数据只保存在这台手机的浏览器里，不会上传。清除浏览器数据、卸载或换手机都会丢失，请定期导出备份（可以发到微信“文件传输助手”或邮箱保存）。</p>
+    </div>
+    <div class="card">
+      <h2>安装到手机桌面</h2>
+      <p class="hint">用 Chrome 打开本页 → 右上角 ⋮ → “添加到主屏幕”或“安装应用”。安装后可离线使用，像普通 App 一样打开。</p>
+      <p class="hint">小米 / 红米手机点了没反应：到系统“设置 → 应用管理”找到所用的浏览器，在权限里打开“桌面快捷方式”，再试一次。用小米自带浏览器也可以：菜单 → “添加到桌面”。注意换浏览器后数据不互通，请固定用一个。</p>
+      <div class="actions" style="margin-top:10px"><button type="button" id="btnInstall" hidden>立即安装</button></div>
+      <p class="hint" id="storageInfo"></p>
+    </div>
+    <div class="card">
+      <h2>清空数据</h2>
+      <button type="button" id="btnClear" class="danger">删除全部记录</button>
+    </div>
+    <div class="card">
+      <h2>说明</h2>
+      <ul class="hint about">
+        <li>每天早上醒来后、起床活动和说话前测量，尽量固定时间、同一支体温计、同一部位。</li>
+        <li>排卵判断用“3 高于 6”规则：连续 3 天体温高于前 6 天的最高值，且第 3 天至少高 0.20℃（否则需要第 4 天仍高于覆盖线）。覆盖线 = 升温前 6 天的最高体温；推测排卵日 = 升温前 1 天。</li>
+        <li>勾选“体温受干扰”的数据不参与计算，图上显示为空心点；漏测的日子曲线会断开。</li>
+        <li>下次月经与易孕期按最近 6 个周期的平均长度估算，仅供参考，不能用于避孕，也不能代替医生诊断。</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" role="tablist" aria-label="主菜单">
+  <button type="button" role="tab" id="t-record" data-tab="record" aria-controls="tab-record" aria-selected="true"><span class="ico" aria-hidden="true">📝</span>记录</button>
+  <button type="button" role="tab" id="t-chart" data-tab="chart" aria-controls="tab-chart" aria-selected="false"><span class="ico" aria-hidden="true">📈</span>体温表</button>
+  <button type="button" role="tab" id="t-history" data-tab="history" aria-controls="tab-history" aria-selected="false"><span class="ico" aria-hidden="true">📅</span>历史</button>
+  <button type="button" role="tab" id="t-settings" data-tab="settings" aria-controls="tab-settings" aria-selected="false"><span class="ico" aria-hidden="true">⚙️</span>备份/设置</button>
+</nav>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
