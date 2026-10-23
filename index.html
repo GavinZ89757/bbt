@@ -89,6 +89,8 @@
   .tabbar button[aria-selected="true"] { color: var(--pri); font-weight: 600; }
   #toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(40,40,40,.92); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; max-width: 90vw; }
   #toast.show { opacity: 1; }
+  /* author "display:" rules beat the browser's own [hidden] rule, so make hidden always win */
+  [hidden] { display: none !important; }
   /* chart image viewer: long-press to save to the gallery, or take a screenshot */
   .viewer { position: fixed; inset: 0; z-index: 20; background: #1b1b1b; color: #fff; display: flex; flex-direction: column; padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); }
   .viewer-tip { margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: #f2f2f2; }
