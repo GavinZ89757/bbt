@@ -271,13 +271,41 @@
       ctx.drawImage(img, 0, 0, out.width, out.height);
       const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
       if (!blob) throw new Error('图片生成失败');
-      const how = await shareOrDownload(blob, `基础体温表_${lastChart.start}.png`, 'image/png');
-      if (how === 'downloaded') toast('图片已保存到“下载”文件夹');
+      // Show the picture instead of downloading it: 小米浏览器 and other in-app browsers silently drop
+      // blob downloads, but long-press "保存图片" (or a screenshot) always lands in the gallery.
+      openViewer(canvas.toDataURL('image/png'), new File([blob], `基础体温表_${lastChart.start}.png`, { type: 'image/png' }));
     } catch (err) {
       alert('导出失败：' + err.message);
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // ---------- image viewer ----------
+  let viewerFile = null;
+  let viewerReturn = null;
+  function openViewer(dataUrl, file) {
+    viewerFile = file;
+    viewerReturn = $('btnPng'); // the button is disabled while rendering, so activeElement is not reliable here
+    $('viewerImg').src = dataUrl;
+    $('viewerShare').hidden = !(navigator.canShare && navigator.canShare({ files: [file] }));
+    $('viewer').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('viewerClose').focus();
+  }
+  function closeViewer() {
+    $('viewer').hidden = true;
+    $('viewerImg').removeAttribute('src');
+    document.body.style.overflow = '';
+    viewerFile = null;
+    if (viewerReturn && viewerReturn.focus) viewerReturn.focus();
+  }
+  $('viewerClose').addEventListener('click', closeViewer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('viewer').hidden) closeViewer(); });
+  $('viewerShare').addEventListener('click', async () => {
+    if (!viewerFile) return;
+    try { await navigator.share({ files: [viewerFile], title: viewerFile.name }); }
+    catch (err) { if (!err || err.name !== 'AbortError') toast('分享失败，请长按图片保存'); }
   });
 
   async function shareOrDownload(blob, name, type) {

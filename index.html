@@ -89,6 +89,14 @@
   .tabbar button[aria-selected="true"] { color: var(--pri); font-weight: 600; }
   #toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(40,40,40,.92); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; max-width: 90vw; }
   #toast.show { opacity: 1; }
+  /* chart image viewer: long-press to save to the gallery, or take a screenshot */
+  .viewer { position: fixed; inset: 0; z-index: 20; background: #1b1b1b; color: #fff; display: flex; flex-direction: column; padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); }
+  .viewer-tip { margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: #f2f2f2; }
+  .viewer-tip b { color: #ffd166; }
+  .viewer-img { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; background: #fff; border-radius: 8px; }
+  .viewer-img img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto; }
+  .viewer .actions { margin-top: 10px; }
+  .viewer button { flex: 1; }
   @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
 </style>
 </head>
@@ -184,7 +192,7 @@
         <li><i style="background:#fde3e7;border-radius:2px"></i>经期</li>
       </ul>
       <p class="hint">左右滑动查看整个周期；点某一天可以修改那天的记录。</p>
-      <div class="actions" style="margin-top:10px"><button type="button" id="btnPng" class="primary">保存 / 分享图表图片</button></div>
+      <div class="actions" style="margin-top:10px"><button type="button" id="btnPng" class="primary">生成图表图片（可存相册）</button></div>
     </div>
   </section>
 
@@ -238,6 +246,14 @@
   <button type="button" role="tab" id="t-settings" data-tab="settings" aria-controls="tab-settings" aria-selected="false"><span class="ico" aria-hidden="true">⚙️</span>备份/设置</button>
 </nav>
 <div id="toast" role="status" aria-live="polite"></div>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTip" hidden>
+  <p class="viewer-tip" id="viewerTip"><b>长按图片 → 选“保存图片”</b>，就会存进手机相册。<br>如果长按没有这个选项：直接<b>截屏</b>（三指下滑或 电源键+音量下），截图也会存进相册。</p>
+  <div class="viewer-img"><img id="viewerImg" alt="基础体温表图片"></div>
+  <div class="actions">
+    <button type="button" id="viewerShare" hidden>分享…</button>
+    <button type="button" id="viewerClose" class="primary">关闭</button>
+  </div>
+</div>
 
 <script src="core.js"></script>
 <script src="app.js"></script>
