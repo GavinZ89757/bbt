@@ -1,5 +1,8 @@
 // Offline cache for the app shell. Bump CACHE when the file list changes.
-const CACHE = 'bbt-v1';
+// Cache names are per ORIGIN, and every repo under username.github.io shares one origin,
+// so this worker only ever touches caches that start with its own PREFIX.
+const PREFIX = 'bbt-';
+const CACHE = PREFIX + 'v2';
 const ASSETS = ['./', './index.html', './core.js', './app.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -9,7 +12,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
